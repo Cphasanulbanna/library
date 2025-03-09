@@ -16,7 +16,7 @@ app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 //psql client setup
-const client = new Client({
+export const client = new Client({
   user: process.env.USER,
   host: "localhost",
   database: process.env.DB,
