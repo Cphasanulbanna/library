@@ -42,31 +42,51 @@ app.post("/", async (req, res) => {
 });
 
 app.put("/:id", async (req, res) => {
-  
-  const { id } = req.params
-    const { title, description, best_selling } = req.body;
+  const { id } = req.params;
+  const { title, description, best_selling } = req.body;
   try {
-    const result = await client.query("UPDATE books SET title = $1, description =$2, best_selling=$3 WHERE id = $4 RETURNING *", [title, description, best_selling, id])
+    const result = await client.query(
+      "UPDATE books SET title = $1, description =$2, best_selling=$3 WHERE id = $4 RETURNING *",
+      [title, description, best_selling, id]
+    );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({message: `Book not found with id: ${id}`})
+      return res.status(404).json({ message: `Book not found with id: ${id}` });
     }
- 
+
     res.status(200).json({ message: "book updated", books: result.rows?.[0] });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-})
+});
 
 app.get("/", async (req, res) => {
   try {
-    const result = await client.query("SELECT * FROM books")
+    const result = await client.query("SELECT * FROM books");
 
     res.status(200).json({ message: "success", books: result.rows });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-})
+});
+
+app.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await client.query(
+      "DELETE FROM books WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("book not found");
+    }
+
+    res.status(200).json({ message: "book deleted" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
