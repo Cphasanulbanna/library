@@ -90,36 +90,54 @@ app.delete("/:id", async (req, res) => {
 });
 
 app.post("/signup", async (req, res) => {
-  const {email, password} = req.body
+  const { email, password } = req.body;
   try {
-    if (!email || !password) return res.status(400).json({ message: "Email and Password is required" })
-    const hashedPassword = await hashPassword(password)
+    if (!email || !password)
+      return res
+        .status(400)
+        .json({ message: "Email and Password is required" });
     
+    const {rows: emailRecord} = await client.query("SELECT email FROM users WHERE email = $1", [email])
+    if (emailRecord.length > 0) {
+      return res.status(400).json({message: "Email already exists"})
+    }
+    
+    const hashedPassword = await hashPassword(password);
+
     const result = await client.query(
-      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id', [email, password]
-    )
-    
+      "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id",
+      [email, hashedPassword]
+    );
+
+    const userId = result.rows?.[0]?.id;
+    await client.query(
+      "INSERT INTO user_roles(user_id, role_id) VALUES ($1, (SELECT id FROM roles WHERE role_name = $2))",
+      [userId, "User"]
+    );
+
+    res.status(201).json({message: "User created"})
   } catch (error) {
-      res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
 app.post("/role", async (req, res) => {
-  const {role} = req.body
+  const { role } = req.body;
   try {
-    if (!role) return res.status(400).json({ message: "Role is required" })
-    
+    if (!role) return res.status(400).json({ message: "Role is required" });
+
     const result = await client.query(
-      "INSERT INTO roles (role_name) VALUES ($1) RETURNING role_name", [role]
-    )
+      "INSERT INTO roles (role_name) VALUES ($1) RETURNING role_name",
+      [role]
+    );
 
-    return  res.status(201).json({message: "Role created", role: result.rows?.[0]})
-
-    
+    return res
+      .status(201)
+      .json({ message: "Role created", role: result.rows?.[0] });
   } catch (error) {
-      res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
