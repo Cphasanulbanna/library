@@ -2,6 +2,7 @@ import express from "express";
 import pgClient from "pg";
 import dotev from "dotenv";
 import cors from "cors";
+import { hashPassword } from "./encryption.js";
 
 const { Client } = pgClient;
 
@@ -87,6 +88,38 @@ app.delete("/:id", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+app.post("/signup", async (req, res) => {
+  const {email, password} = req.body
+  try {
+    if (!email || !password) return res.status(400).json({ message: "Email and Password is required" })
+    const hashedPassword = await hashPassword(password)
+    
+    const result = await client.query(
+      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id', [email, password]
+    )
+    
+  } catch (error) {
+      res.status(500).json({ message: error.message });
+  }
+})
+
+app.post("/role", async (req, res) => {
+  const {role} = req.body
+  try {
+    if (!role) return res.status(400).json({ message: "Role is required" })
+    
+    const result = await client.query(
+      "INSERT INTO roles (role_name) VALUES ($1) RETURNING role_name", [role]
+    )
+
+    return  res.status(201).json({message: "Role created", role: result.rows?.[0]})
+
+    
+  } catch (error) {
+      res.status(500).json({ message: error.message });
+  }
+})
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
