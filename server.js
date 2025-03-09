@@ -2,7 +2,9 @@ import express from "express";
 import pgClient from "pg";
 import dotev from "dotenv";
 import cors from "cors";
+import bcrypt from "bcrypt"
 import { hashPassword } from "./encryption.js";
+import jwt from "jsonwebtoken"
 
 const { Client } = pgClient;
 
@@ -96,12 +98,15 @@ app.post("/signup", async (req, res) => {
       return res
         .status(400)
         .json({ message: "Email and Password is required" });
-    
-    const {rows: emailRecord} = await client.query("SELECT email FROM users WHERE email = $1", [email])
+
+    const { rows: emailRecord } = await client.query(
+      "SELECT email FROM users WHERE email = $1",
+      [email]
+    );
     if (emailRecord.length > 0) {
-      return res.status(400).json({message: "Email already exists"})
+      return res.status(400).json({ message: "Email already exists" });
     }
-    
+
     const hashedPassword = await hashPassword(password);
 
     const result = await client.query(
@@ -115,7 +120,43 @@ app.post("/signup", async (req, res) => {
       [userId, "User"]
     );
 
-    res.status(201).json({message: "User created"})
+    res.status(201).json({ message: "User created" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    if (!email || !password)
+      return res
+        .status(400)
+        .json({ message: "Email and Password is required" });
+    
+    const { rows: userRow } = await client.query(
+      'SELECT * FROM users WHERE email = $1', [email]
+    )
+        const user = userRow?.[0]
+    if (!user) {
+      return res.status(404).json({message: "User not found"})
+    }
+
+
+    const decodedPassword = await bcrypt.compare(password, user.password)
+    if (!decodedPassword) {
+       return res.status(401).json({message: 'Invalid password'});
+    }
+
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" })
+    
+    await client.query(
+      'INSERT INTO sessions (user_id, token) VALUES ($1, $2)', [user.id, token]
+    )
+
+    const {rows: roleObject} = await client.query('SELECT role_name FROM roles INNER JOIN user_roles on roles.id = user_roles.role_id WHERE user_roles.user_id  =$1', [user.id])
+
+    res.status(200).json({token, email: user.email, role: roleObject?.[0]?.role_name})
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
